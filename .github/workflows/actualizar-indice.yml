@@ -41,6 +41,15 @@ jobs:
             echo "Cargarlos en Settings → Secrets and variables → Actions."
             exit 1
           fi
+          # Diagnostico sin exponer los valores: solo la cantidad de caracteres.
+          # Sirve para detectar espacios o saltos de linea pegados por error.
+          echo "Email: ${#MEGA_EMAIL} caracteres | Contrasena: ${#MEGA_PASSWORD} caracteres"
+          MEGA_EMAIL="$(printf '%s' "$MEGA_EMAIL" | tr -d '\r\n')"
+          MEGA_PASSWORD="$(printf '%s' "$MEGA_PASSWORD" | tr -d '\r\n')"
+          case "$MEGA_EMAIL" in
+            *@*) ;;
+            *) echo "::error::MEGA_EMAIL no parece un mail. Puede que esten invertidos los dos secrets."; exit 1 ;;
+          esac
           mega-cmd-server --nodetach >/tmp/megaserver.log 2>&1 &
           sleep 8
           if ! mega-login "$MEGA_EMAIL" "$MEGA_PASSWORD" 2>&1 | tee /tmp/login.log; then
