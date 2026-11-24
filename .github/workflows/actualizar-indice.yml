@@ -1,0 +1,94 @@
+name: Actualizar indice del archivo
+
+# Corre todos los dias a las 11:00 de Argentina (14:00 UTC).
+# Tambien se puede disparar a mano desde la pestana Actions.
+on:
+  schedule:
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write        # para poder publicar los archivos generados
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Traer el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar MEGAcmd
+        run: |
+          set -e
+          VER=$(lsb_release -rs)
+          URL="https://mega.nz/linux/repo/xUbuntu_${VER}/amd64/megacmd-xUbuntu_${VER}_amd64.deb"
+          echo "Bajando MEGAcmd para Ubuntu ${VER}"
+          curl -fsSL -o /tmp/megacmd.deb "$URL"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq /tmp/megacmd.deb
+          mega-version || true
+
+      - name: Iniciar sesion en MEGA
+        env:
+          MEGA_EMAIL: ${{ secrets.MEGA_EMAIL }}
+          MEGA_PASSWORD: ${{ secrets.MEGA_PASSWORD }}
+        run: |
+          set -e
+          if [ -z "$MEGA_EMAIL" ] || [ -z "$MEGA_PASSWORD" ]; then
+            echo "::error::Faltan los secrets MEGA_EMAIL y/o MEGA_PASSWORD."
+            echo "Cargarlos en Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          mega-cmd-server --nodetach >/tmp/megaserver.log 2>&1 &
+          sleep 8
+          if ! mega-login "$MEGA_EMAIL" "$MEGA_PASSWORD" 2>&1 | tee /tmp/login.log; then
+            echo "::error::No se pudo iniciar sesion en MEGA. Ver el detalle arriba."
+            exit 1
+          fi
+          # Esperar a que termine de bajar el arbol de la cuenta
+          for i in $(seq 1 60); do
+            if mega-whoami 2>/dev/null | grep -qi "@"; then
+              echo "Sesion iniciada."
+              break
+            fi
+            sleep 5
+          done
+          mega-whoami
+
+      - name: Instalar dependencias de Python
+        run: pip install --quiet pandas openpyxl
+
+      - name: Generar el indice
+        working-directory: actualizador
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: |
+          set -e
+          # El script lee el sheet_id de config.txt. No lleva token:
+          # la publicacion la hace git, mas abajo.
+          printf 'sheet_id = %s\n' "${SHEET_ID:-14FIc2LqsYqLeuRmPc77SYYPGsrjS1tkjFUwxRY52oKM}" > config.txt
+          python actualizar_indice.py
+
+      - name: Publicar los archivos actualizados
+        run: |
+          set -e
+          cp actualizador/salida/indice-web.json .
+          cp actualizador/salida/extras.json .
+          cp actualizador/salida/buscador-chat.html .
+          cp actualizador/salida/buscador-archivo.html .
+          git config user.name  "Actualizador automatico"
+          git config user.email "actions@github.com"
+          git add indice-web.json extras.json buscador-chat.html buscador-archivo.html
+          if git diff --cached --quiet; then
+            echo "Sin cambios: el archivo no se movio desde la ultima corrida."
+          else
+            git commit -m "Actualizacion automatica del indice - $(date -u +%Y-%m-%d)"
+            git push
+            echo "Publicado."
+          fi
+
+      - name: Cerrar sesion de MEGA
+        if: always()
+        run: mega-logout || true
