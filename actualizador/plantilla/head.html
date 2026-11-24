@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archivo audiovisual · Buscador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --tinta:#16232E; --papel:#F1F2EE; --panel:#FFFFFF;
+  --linea:#CBCEC6; --senal:#D99B12; --agua:#2E6E73; --gris:#6B7169;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--papel);color:var(--tinta);
+  font-family:'Archivo',system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+
+header.top{padding:34px 0 22px;border-bottom:2px solid var(--tinta)}
+h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.015em}
+.sub{margin:5px 0 0;color:var(--gris);font-size:14px}
+
+.buscador{margin:22px 0 0;display:flex;gap:10px;flex-wrap:wrap}
+#q{flex:1 1 320px;min-width:0;font-family:inherit;font-size:20px;font-weight:500;
+  padding:15px 17px;border:2px solid var(--tinta);background:var(--panel);
+  color:var(--tinta);border-radius:2px}
+#q:focus{outline:3px solid var(--senal);outline-offset:1px}
+#q::placeholder{color:#9AA096;font-weight:400}
+
+.filtros{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0 0;align-items:center}
+select,input[type=date]{font-family:inherit;font-size:13px;padding:8px 10px;
+  border:1px solid var(--linea);background:var(--panel);color:var(--tinta);border-radius:2px}
+select:focus,input:focus{outline:2px solid var(--senal);outline-offset:1px}
+.limpiar{font-family:inherit;font-size:13px;padding:8px 12px;cursor:pointer;
+  background:none;border:1px solid var(--linea);color:var(--gris);border-radius:2px}
+.limpiar:hover{border-color:var(--tinta);color:var(--tinta)}
+
+.barra{display:flex;justify-content:space-between;align-items:baseline;
+  gap:14px;padding:16px 0 9px;flex-wrap:wrap}
+.cuenta{font-size:14px;font-weight:600}
+.cuenta em{font-style:normal;color:var(--gris);font-weight:400}
+.acciones{display:flex;gap:8px}
+.acciones button{font-family:inherit;font-size:13px;padding:7px 12px;cursor:pointer;
+  background:var(--tinta);color:var(--papel);border:none;border-radius:2px}
+.acciones button:hover{background:#2A3D4C}
+
+ul.res{list-style:none;margin:0;padding:0 0 60px}
+li.op{display:grid;grid-template-columns:104px 1fr;gap:18px;
+  padding:16px 0;border-bottom:1px solid var(--linea)}
+.fecha{font-variant-numeric:tabular-nums;font-size:13px;font-weight:600;
+  padding-left:11px;border-left:3px solid var(--senal);line-height:1.35}
+.fecha .anio{display:block;color:var(--gris);font-weight:400}
+.fecha.sinf{border-left-color:var(--linea);color:var(--gris)}
+.desc{margin:0 0 5px;font-size:16px;font-weight:600;line-height:1.32}
+.meta{font-size:13px;color:var(--gris);margin:0 0 6px}
+.meta b{font-weight:500;color:var(--tinta)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0 0}
+.tag{font-size:12px;padding:2px 8px;border:1px solid var(--linea);border-radius:2px;background:var(--panel)}
+.tag.dep{border-color:var(--agua);color:var(--agua)}
+.tag.mat{color:var(--gris)}
+.ruta{margin:9px 0 0;font-size:12px;color:var(--gris);word-break:break-word;
+  display:flex;gap:9px;align-items:flex-start}
+.ruta code{font-family:'Archivo',sans-serif;background:#E6E8E2;padding:2px 6px;border-radius:2px;flex:1}
+.abrir{flex:none;font-size:12px;font-weight:600;padding:3px 10px;text-decoration:none;
+  background:var(--tinta);color:var(--papel);border-radius:2px}
+.abrir:hover{background:var(--agua)}
+.abrir:focus-visible{outline:3px solid var(--senal);outline-offset:2px}
+.nolink{flex:none;font-size:12px;padding:3px 9px;color:#A8ACA3;border:1px dashed var(--linea);border-radius:2px}
+.copiar{flex:none;font-family:inherit;font-size:12px;padding:3px 9px;cursor:pointer;
+  border:1px solid var(--linea);background:var(--panel);color:var(--gris);border-radius:2px}
+.copiar:hover{border-color:var(--tinta);color:var(--tinta)}
+mark{background:var(--senal);color:var(--tinta);padding:0 1px}
+.vacio{padding:52px 0;text-align:center;color:var(--gris)}
+.vacio p{margin:0 0 6px}
+.mas{display:block;width:100%;margin:22px 0;padding:13px;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;background:var(--panel);
+  border:1px solid var(--linea);color:var(--tinta);border-radius:2px}
+.mas:hover{border-color:var(--tinta)}
+footer{border-top:1px solid var(--linea);padding:16px 0 40px;font-size:12px;color:var(--gris)}
+@media(max-width:640px){
+  li.op{grid-template-columns:1fr;gap:7px}
+  .fecha{border-left:none;border-top:3px solid var(--senal);padding:7px 0 0}
+  .fecha .anio{display:inline;margin-left:6px}
+  #q{font-size:17px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <h1>Archivo audiovisual — buscador de carpetas</h1>
+  <p class="sub">Ministerio de Infraestructura y Servicios Públicos de Córdoba · archivo 2024–2026</p>
+  <div class="buscador">
+    <input id="q" type="search" placeholder="Buscá por localidad, obra, ruta o tema — probá &quot;Cruz del Eje&quot;" autocomplete="off">
+  </div>
+  <div class="filtros">
+    <select id="fDep"></select>
+    <select id="fArea"></select>
+    <select id="fAnio"></select>
+    <label style="font-size:13px;color:var(--gris)">desde <input type="date" id="fD1"></label>
+    <label style="font-size:13px;color:var(--gris)">hasta <input type="date" id="fD2"></label>
+    <button class="limpiar" id="reset">Quitar filtros</button>
+  </div>
+</header>
+<div class="barra">
+  <span class="cuenta" id="cuenta"></span>
+  <span class="acciones"><button id="csv">Descargar resultados</button></span>
+</div>
+<ul class="res" id="res"></ul>
+<footer id="pie"></footer>
+</div>
+<script id="datos" type="application/json">

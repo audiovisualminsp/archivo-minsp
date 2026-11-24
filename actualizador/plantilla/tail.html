@@ -1,0 +1,108 @@
+</script>
+<script>
+const DATOS = JSON.parse(document.getElementById('datos').textContent);
+const N = s => (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+DATOS.forEach(r => { r._b = N([r.d,r.a,r.j,r.l,r.p,r.s,r.m,r.r].join(' ')); });
+
+const $ = id => document.getElementById(id);
+const PASO = 60; let visibles = PASO;
+
+function opciones(sel, vals, etiqueta){
+  sel.innerHTML = '<option value="">'+etiqueta+'</option>' +
+    vals.map(v=>'<option>'+v.replace(/</g,'&lt;')+'</option>').join('');
+}
+opciones($('fDep'), [...new Set(DATOS.flatMap(r=>r.p.split('; ')).filter(Boolean))].sort(), 'Todos los departamentos');
+opciones($('fArea'), [...new Set(DATOS.map(r=>r.a).filter(Boolean))].sort(), 'Todas las áreas');
+opciones($('fAnio'), [...new Set(DATOS.map(r=>r.f.slice(0,4)).filter(Boolean))].sort().reverse(), 'Todos los años');
+
+function filtrar(){
+  const terminos = N($('q').value).split(/\s+/).filter(Boolean);
+  const dep=$('fDep').value, area=$('fArea').value, anio=$('fAnio').value;
+  const d1=$('fD1').value, d2=$('fD2').value;
+  return DATOS.filter(r=>{
+    if(terminos.length && !terminos.every(t=>r._b.includes(t))) return false;
+    if(dep && !r.p.split('; ').includes(dep)) return false;
+    if(area && r.a!==area) return false;
+    if(anio && r.f.slice(0,4)!==anio) return false;
+    if(d1 && (!r.f || r.f<d1)) return false;
+    if(d2 && (!r.f || r.f>d2)) return false;
+    return true;
+  });
+}
+
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function resaltar(txt){
+  const terminos = $('q').value.trim().split(/\s+/).filter(Boolean);
+  let h = esc(txt);
+  terminos.forEach(t=>{
+    const re = new RegExp('('+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    h = h.replace(re,'<mark>$1</mark>');
+  });
+  return h;
+}
+
+function fechaLarga(f){
+  if(!f) return '<span class="anio">sin fecha</span>';
+  const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const [y,m,d]=f.split('-');
+  return d+' '+M[+m-1]+'<span class="anio">'+y+'</span>';
+}
+
+let ultimos = [];
+function pintar(){
+  const r = filtrar(); ultimos = r;
+  $('cuenta').innerHTML = r.length===0 ? 'Sin resultados'
+    : '<b>'+r.length.toLocaleString('es-AR')+'</b> '+(r.length===1?'carpeta':'carpetas')+
+      ' <em>de '+DATOS.length.toLocaleString('es-AR')+'</em>';
+  if(r.length===0){
+    $('res').innerHTML='<li class="vacio"><p>Ningún operativo coincide con esa búsqueda.</p>'+
+      '<p>Probá con menos palabras, o quitá los filtros de fecha.</p></li>';
+    return;
+  }
+  const trozo = r.slice(0, visibles);
+  $('res').innerHTML = trozo.map((x,i)=>{
+    const loc = x.l ? x.l.split('; ').map(v=>'<span class="tag">'+esc(v)+'</span>').join('') : '';
+    const dep = x.p ? x.p.split('; ').map(v=>'<span class="tag dep">'+esc(v)+'</span>').join('') : '';
+    const mat = x.m ? x.m.split('; ').slice(0,7).map(v=>'<span class="tag mat">'+esc(v)+'</span>').join('') : '';
+    return '<li class="op">'+
+      '<div class="fecha'+(x.f?'':' sinf')+'">'+fechaLarga(x.f)+'</div>'+
+      '<div><p class="desc">'+resaltar(x.d)+'</p>'+
+      (x.a?'<p class="meta"><b>'+esc(x.a)+'</b>'+(x.j?' · '+esc(x.j):'')+'</p>':'')+
+      (x.s?'<p class="meta">Incluye: '+resaltar(x.s)+'</p>':'')+
+      ((loc||dep||mat)?'<div class="tags">'+dep+loc+mat+'</div>':'')+
+      '<div class="ruta">'+(x.k?'<a class="abrir" href="'+esc(x.k)+'" target="_blank" rel="noopener">Abrir en MEGA</a>':'<span class="nolink">sin link</span>')+
+      '<code>'+esc(x.r)+'</code>'+
+      '<button class="copiar" data-i="'+i+'">'+(x.k?'Copiar link':'Copiar ruta')+'</button></div>'+
+      '</div></li>';
+  }).join('');
+  if(r.length>visibles){
+    $('res').insertAdjacentHTML('beforeend',
+      '<li><button class="mas" id="mas">Ver '+Math.min(PASO,r.length-visibles)+' más</button></li>');
+    $('mas').onclick=()=>{visibles+=PASO;pintar();};
+  }
+  document.querySelectorAll('.copiar').forEach(b=>{
+    b.onclick=()=>{navigator.clipboard.writeText(trozo[+b.dataset.i].k||trozo[+b.dataset.i].r)
+      .then(()=>{b.textContent='Copiada';setTimeout(()=>b.textContent='Copiar ruta',1400);});};
+  });
+}
+
+['q','fDep','fArea','fAnio','fD1','fD2'].forEach(id=>{
+  $(id).addEventListener('input',()=>{visibles=PASO;pintar();});
+});
+$('reset').onclick=()=>{['q','fDep','fArea','fAnio','fD1','fD2'].forEach(i=>$(i).value='');visibles=PASO;pintar();};
+$('csv').onclick=()=>{
+  const cab=['fecha','descripcion','area','jerarquia','localidades','departamentos','subobras','materiales','ruta','link'];
+  const esc2=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
+  const txt='\uFEFF'+cab.join(',')+'\n'+ultimos.map(r=>
+    [r.f,r.d,r.a,r.j,r.l,r.p,r.s,r.m,r.r,r.k].map(esc2).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'}));
+  a.download='busqueda-archivo.csv';a.click();
+};
+const conF = DATOS.filter(r=>r.f).length, conL = DATOS.filter(r=>r.k).length;
+$('pie').textContent = DATOS.length.toLocaleString('es-AR')+' carpetas de operativo · '+
+  conF.toLocaleString('es-AR')+' con fecha · '+conL.toLocaleString('es-AR')+' con link a MEGA';
+pintar();
+</script>
+</body>
+</html>

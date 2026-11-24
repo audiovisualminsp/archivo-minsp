@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscador del archivo audiovisual</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--tinta:#16232E;--fondo:#E7E4DC;--mio:#D7E7C8;--bot:#FFFFFF;
+      --linea:#C9CCC4;--gris:#6B7169;--senal:#D99B12;--agua:#2E6E73}
+*{box-sizing:border-box}
+body{margin:0;background:#D3D0C7;font-family:'Archivo',system-ui,sans-serif;
+     font-size:15px;color:var(--tinta);display:flex;justify-content:center}
+.tel{width:100%;max-width:520px;height:100dvh;display:flex;flex-direction:column;
+     background:var(--fondo);border-left:1px solid var(--linea);border-right:1px solid var(--linea)}
+.cab{background:var(--tinta);color:#F1F2EE;padding:13px 16px;display:flex;
+     align-items:center;gap:12px;flex:none}
+.av{width:38px;height:38px;border-radius:50%;background:var(--senal);color:var(--tinta);
+    display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
+.cab h1{margin:0;font-size:15px;font-weight:600}
+.cab p{margin:1px 0 0;font-size:12px;opacity:.65}
+.chat{flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;gap:9px}
+.msg{max-width:85%;padding:9px 12px;border-radius:9px;line-height:1.45;
+     font-size:14.5px;white-space:pre-wrap;word-break:break-word;
+     box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.msg.yo{align-self:flex-end;background:var(--mio);border-bottom-right-radius:2px}
+.msg.bot{align-self:flex-start;background:var(--bot);border-bottom-left-radius:2px}
+.msg a{color:var(--agua);font-weight:600}
+.msg .op{display:block;padding:7px 0;border-top:1px solid #EDEDE8}
+.msg .op:first-of-type{border-top:none}
+.msg .fh{font-size:12px;color:var(--gris);font-variant-numeric:tabular-nums}
+.hora{font-size:10.5px;color:var(--gris);text-align:right;margin:3px 0 -3px}
+.pensando{align-self:flex-start;background:var(--bot);padding:11px 14px;border-radius:9px;
+          display:flex;gap:4px;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.pensando i{width:6px;height:6px;border-radius:50%;background:#B9BDB4;animation:p 1.2s infinite}
+.pensando i:nth-child(2){animation-delay:.2s}.pensando i:nth-child(3){animation-delay:.4s}
+@keyframes p{0%,60%,100%{opacity:.3}30%{opacity:1}}
+.pie{flex:none;padding:9px 12px;background:#DCD9D1;display:flex;gap:8px;align-items:flex-end}
+#txt{flex:1;font-family:inherit;font-size:15px;padding:10px 13px;border:1px solid var(--linea);
+     border-radius:20px;background:#fff;color:var(--tinta);resize:none;max-height:96px;line-height:1.4}
+#txt:focus{outline:2px solid var(--senal);outline-offset:1px}
+#enviar{flex:none;width:42px;height:42px;border-radius:50%;border:none;cursor:pointer;
+        background:var(--tinta);color:#F1F2EE;font-size:17px}
+#enviar:disabled{opacity:.4;cursor:default}
+.sug{display:flex;gap:7px;flex-wrap:wrap;padding:0 14px 12px}
+.sug button{font-family:inherit;font-size:12.5px;padding:6px 11px;cursor:pointer;
+            background:#fff;border:1px solid var(--linea);border-radius:14px;color:var(--tinta)}
+.sug button:hover{border-color:var(--tinta)}
+@media(prefers-reduced-motion:reduce){.pensando i{animation:none;opacity:.6}}
+</style>
+</head>
+<body>
+<div class="tel">
+  <div class="cab">
+    <div class="av">A</div>
+    <div><h1>Archivo MinSP</h1><p>Buscador de material audiovisual</p></div>
+  </div>
+  <div class="chat" id="chat"></div>
+  <div class="sug" id="sug"></div>
+  <div class="pie">
+    <textarea id="txt" rows="1" placeholder="Escribí tu consulta..."></textarea>
+    <button id="enviar" title="Enviar">➤</button>
+  </div>
+</div>
+<script id="datos" type="application/json">

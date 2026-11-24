@@ -1,0 +1,273 @@
+</script>
+<script id="extras" type="application/json">EXTRAS_AQUI</script>
+<script>
+const IDX=JSON.parse(document.getElementById('datos').textContent);
+const EX =JSON.parse(document.getElementById('extras').textContent);
+const N=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+IDX.forEach(r=>{r._b=N([r.d,r.n,r.a,r.j,r.l,r.p,r.s,r.m,r.r].join(' '));r._r=N(r.r);});
+const MAX=8, $=id=>document.getElementById(id), chat=$('chat');
+const DEPTOS=[...new Set(IDX.flatMap(r=>r.p.split('; ')).filter(Boolean))];
+const LOCS  =[...new Set(IDX.flatMap(r=>r.l.split('; ')).filter(Boolean))].sort((a,b)=>b.length-a.length);
+const FUNC  =Object.keys(EX.funcionarios);
+const ALIAS_ORD=Object.keys(EX.alias||{}).map(N).sort((a,b)=>b.length-a.length);
+const MESES ={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,
+              septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12};
+const MAT   ={drone:'drone',dron:'drone',testimonio:'testimonio',testimonios:'testimonio',
+              editadas:'editad',editada:'editad',seleccionadas:'selecc',crudos:'crudo',
+              raw:'raw',sony:'sony',osmo:'osmo',celular:'celu',placas:'placa'};
+const PREF_RUTA="(?:r(?:uta)?s?\\.?\\s*(?:p(?:rov(?:incial)?)?|n(?:ac(?:ional)?)?)?\\.?|au(?:tovia)?)";
+const RE_RUTA=new RegExp("(?<![a-z0-9])"+PREF_RUTA+"\\s*n?[°ºo]?\\s*[-–.:]?\\s*([a-z]?\\s*[-–.]?\\s*\\d{1,3}[-–]?[a-z]?)(?![0-9])","gi");
+function reRutaIndice(nums){
+  const alt=nums.map(n=>{
+    const letra=n.match(/^[A-Z]/)?n[0]:'';
+    const cifra=n.replace(/^[A-Z]/,'').replace(/[A-Z]$/,'');
+    const cola=n.match(/[A-Z]$/)?n.slice(-1):'';
+    return (letra?letra+'\\s*[-–.]?\\s*':'')+cifra+(cola?'\\s*'+cola:'');
+  }).join('|');
+  return new RegExp("(?<![a-z0-9])"+PREF_RUTA+"\\s*n?[°ºo]?\\s*[-–.:]?\\s*(?:"+alt+")(?![0-9])","i");
+}
+const PRESENCIA=/\b(en (la )?obras?|durante|junto a|acompan|visit|recorr|estuvo|inaugur|particip|fue a|asisti|entreg|firm|present)/;
+const VACIAS=new Set(['dame','damelo','pasame','necesito','quiero','todo','todos','toda','todas',
+ 'lo','la','el','los','las','que','tengas','tengan','haya','hay','sobre','de','del','en','y','o',
+ 'un','una','unos','unas','con','para','por','al','a','material','contenido','carpeta','carpetas',
+ 'foto','fotos','video','videos','imagenes','imagen','archivo','buscar','busca','me','mi','se',
+ 'hola','che','porfa','favor','gracias','tenes','tiene','algo','cosas','cosa','sobre',
+ 'obra','obras','trabajo','trabajos','cobertura','coberturas','registro','registros','toma','tomas',
+ 'ultimo','ultima','ultimos','ultimas','primer','primera','primeros','primeras','reciente','recientes',
+ 'nuevo','nueva','nuevos','nuevas','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez',
+ 'mas','menos','tambien','tenemos','hicimos','hizo','ver','mostrar','mostrame','busco',
+ 'cubrio','cubrieron','cubierto','cubre','cubrir','cobertura','saco','sacaron','filmo','fotografio',
+ 'cual','cuales','cuando','donde','como']);
+
+// Quita el plural para que "licitaciones" encuentre "licitacion" y viceversa.
+function raiz(w){
+  if(w.length>5 && /es$/.test(w)) return w.slice(0,-2);
+  if(w.length>4 && /s$/.test(w))  return w.slice(0,-1);
+  return w;
+}
+// Busca la palabra como comienzo de palabra: así "pavimentacion" no trae "repavimentacion".
+const reTermino=w=>new RegExp('\\b'+raiz(w).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+const pad=n=>String(n).padStart(2,'0');
+const iso=(y,m,d)=>`${y}-${pad(m)}-${pad(d)}`;
+const finDeMes=(y,m)=>new Date(y,m,0).getDate();
+
+function interpretar(txt){
+  const t=N(txt); const c={texto:'',departamento:'',localidad:'',funcionario:'',
+    solo_presencia:false,material:'',desde:'',hasta:'',rutas:[],limite:0,orden:'desc'};
+  let resto=' '+t+' ';
+  const sacar=re=>{resto=resto.replace(re,' ');};
+
+  // funcionario: primero por alias (el ministro, fabian lopez, edgar...), después por apellido
+  for(const a of ALIAS_ORD){ if(resto.includes(' '+a+' ')||resto.includes(' '+a+',')){
+      c.funcionario=EX.alias[a];
+      sacar(new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'));
+      sacar(new RegExp('\\b'+N(c.funcionario)+'\\b','g'));
+      break; } }
+  if(!c.funcionario){
+    for(const f of FUNC){ if(resto.includes(N(f))){ c.funcionario=f;
+        sacar(new RegExp(N(f),'g')); break; } }
+  }
+  if(c.funcionario) c.solo_presencia = PRESENCIA.test(t) || /\ben\b/.test(t);
+
+  // rutas: acepta ruta / rp / rn / r.p. / r28 / ruta provincial / autovia
+  RE_RUTA.lastIndex=0; let m;
+  while((m=RE_RUTA.exec(resto))) c.rutas.push(m[1].replace(/[\s.\-–]/g,'').toUpperCase());
+  c.rutas=[...new Set(c.rutas)];
+  if(c.rutas.length) sacar(RE_RUTA);
+
+  // departamento y localidad
+  for(const d of DEPTOS){ if(resto.includes(' '+N(d)+' ')){ c.departamento=d; sacar(new RegExp(N(d),'g')); break; } }
+  for(const l of LOCS){ if(resto.includes(N(l))){ c.localidad=l; sacar(new RegExp(N(l),'g')); break; } }
+
+  // material
+  for(const k in MAT){ if(new RegExp('\\b'+k+'\\b').test(resto)){ c.material=MAT[k];
+      sacar(new RegExp('\\b'+k+'\\b','g')); break; } }
+
+  // cantidad y orden
+  let g;
+  if((g=resto.match(/\b(?:ultim[ao]s?|recientes?)\s+(\d{1,2})\b/))){ c.limite=+g[1]; c.orden='desc';
+    sacar(/\b(?:ultim[ao]s?|recientes?)\s+\d{1,2}\b/g); }
+  else if((g=resto.match(/\b(\d{1,2})\s+(?:ultim[ao]s?|mas recientes?|recientes?)\b/))){ c.limite=+g[1]; c.orden='desc';
+    sacar(/\b\d{1,2}\s+(?:ultim[ao]s?|mas recientes?|recientes?)\b/g); }
+  else if((g=resto.match(/\b(?:primer[ao]s?)\s+(\d{1,2})\b/))){ c.limite=+g[1]; c.orden='asc';
+    sacar(/\b(?:primer[ao]s?)\s+\d{1,2}\b/g); }
+  else if((g=resto.match(/\b(\d{1,2})\s+(?:obras?|carpetas?|resultados?|trabajos?|salidas?|coberturas?)\b/))){
+    c.limite=+g[1]; sacar(/\b\d{1,2}\s+(?:obras?|carpetas?|resultados?|trabajos?|salidas?|coberturas?)\b/g); }
+  else if(/\b(ultim[ao]s?|recientes?)\b/.test(resto)){ c.orden='desc'; }
+
+  // fechas
+  const hoy=new Date(), Y=hoy.getFullYear();
+  const rango=(a,b)=>{c.desde=a;c.hasta=b;};
+  let f;
+  if((f=resto.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})\b/))){
+    rango(iso(+f[3],+f[2],+f[1]),iso(+f[3],+f[2],+f[1])); sacar(/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{4}\b/g);
+  } else if((f=resto.match(/\b(\d{1,2})\s+de\s+([a-z]+)(?:\s+(?:de\s+)?(\d{4}))?/)) && MESES[f[2]]){
+    const y=f[3]?+f[3]:Y, mm=MESES[f[2]];
+    rango(iso(y,mm,+f[1]),iso(y,mm,+f[1])); sacar(new RegExp(f[0],'g'));
+  } else if((f=resto.match(/\b([a-z]+)(?:\s+(?:de\s+)?(\d{4}))?\b/g))){
+    for(const w of f){ const k=w.trim(); if(MESES[k]){
+      const y=(resto.match(new RegExp(k+'\\s+(?:de\\s+)?(\\d{4})'))||[])[1];
+      const yy=y?+y:Y, mm=MESES[k];
+      rango(iso(yy,mm,1),iso(yy,mm,finDeMes(yy,mm))); sacar(new RegExp(k+'(\\s+de)?(\\s+\\d{4})?','g')); break; } }
+  }
+  if(!c.desde){
+    if(/\bhoy\b/.test(resto)){const s=hoy.toISOString().slice(0,10);rango(s,s);sacar(/\bhoy\b/g);}
+    else if(/\bayer\b/.test(resto)){const d=new Date(hoy);d.setDate(d.getDate()-1);
+      const s=d.toISOString().slice(0,10);rango(s,s);sacar(/\bayer\b/g);}
+    else if(/semana pasada|ultima semana|ultimos 7/.test(resto)){const d=new Date(hoy);d.setDate(d.getDate()-7);
+      rango(d.toISOString().slice(0,10),hoy.toISOString().slice(0,10));sacar(/semana pasada|ultima semana|ultimos 7( dias)?/g);}
+    else if(/esta semana/.test(resto)){const d=new Date(hoy);d.setDate(d.getDate()-hoy.getDay());
+      rango(d.toISOString().slice(0,10),hoy.toISOString().slice(0,10));sacar(/esta semana/g);}
+    else if(/mes pasado/.test(resto)){const y=hoy.getMonth()===0?Y-1:Y,mm=hoy.getMonth()===0?12:hoy.getMonth();
+      rango(iso(y,mm,1),iso(y,mm,finDeMes(y,mm)));sacar(/mes pasado/g);}
+    else if(/este mes|del mes/.test(resto)){const mm=hoy.getMonth()+1;
+      rango(iso(Y,mm,1),iso(Y,mm,finDeMes(Y,mm)));sacar(/este mes|del mes/g);}
+    else if(/este ano|ano actual/.test(resto)){rango(iso(Y,1,1),iso(Y,12,31));sacar(/este ano|ano actual/g);}
+    else if((f=resto.match(/\bultimos?\s+(\d{1,3})\s+dias\b/))){const d=new Date(hoy);d.setDate(d.getDate()-(+f[1]));
+      rango(d.toISOString().slice(0,10),hoy.toISOString().slice(0,10));sacar(/\bultimos?\s+\d{1,3}\s+dias\b/g);}
+    else if((f=resto.match(/\b(20\d{2})\b/))){rango(iso(+f[1],1,1),iso(+f[1],12,31));sacar(/\b20\d{2}\b/g);}
+  }
+
+  if(c.funcionario) sacar(/\b(visita|visitas|visito|recorrida|recorridas|recorrio|estuvo|fue|asistio|presencia)\b/g);
+  c.texto=[c.localidad, ...resto.split(/[^a-z0-9ñ]+/).filter(w=>w.length>2&&!VACIAS.has(w))]
+          .filter(Boolean).join(' ');
+  return c;
+}
+
+function filtrar(c){
+  const t=N(c.texto).split(/\s+/).filter(Boolean).map(reTermino);
+  const reRuta=c.rutas.length ? reRutaIndice(c.rutas) : null;
+  return IDX.filter(r=>{
+    if(reRuta && !reRuta.test(r._b)) return false;
+    if(t.length && !t.every(re=>re.test(r._b))) return false;
+    if(c.departamento && !r.p.split('; ').includes(c.departamento)) return false;
+    if(c.material && !N(r.m).includes(c.material)) return false;
+    if(c.desde && (!r.f||r.f<c.desde)) return false;
+    if(c.hasta && (!r.f||r.f>c.hasta)) return false;
+    if(c.funcionario){
+      if(!r._r.includes(N(c.funcionario))) return false;
+      if(c.solo_presencia && !/reunion|reuniones/.test(r._r)) return false;
+    }
+    return true;
+  }).sort((a,b)=>(b.f||'').localeCompare(a.f||''));
+}
+const hayCriterios=c=>!!(c.texto||c.departamento||c.funcionario||c.material||c.desde||c.hasta||c.rutas.length);
+function describirRuta(c){return c.rutas.length?'de la Ruta '+c.rutas.join(' y '):'';}
+
+/* ---------- redacción ---------- */
+const elegir=a=>a[Math.floor(Math.random()*a.length)];
+const MES3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function fechaCorta(f){if(!f)return'sin fecha';const[y,m,d]=f.split('-');return d+' '+MES3[+m-1]+' '+y;}
+const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function describir(c){
+  const p=[];
+  if(c.funcionario){
+    const cargo=(EX.funcionarios||{})[c.funcionario];
+    p.push((c.solo_presencia?'con presencia de ':'del área de ')+c.funcionario+
+           (cargo?' ('+cargo+')':''));
+  }
+  if(c.localidad) p.push('en '+c.localidad);
+  else if(c.departamento) p.push('en el departamento '+c.departamento);
+  if(c.material) p.push('con material '+c.material);
+  if(c.rutas.length) p.push('de la Ruta '+c.rutas.join(' y '));
+  if(c.desde&&c.hasta&&c.desde===c.hasta) p.push('del '+fechaCorta(c.desde));
+  else if(c.desde) p.push('entre el '+fechaCorta(c.desde)+' y el '+fechaCorta(c.hasta));
+  return p.join(', ');
+}
+function lista(res,tope){
+  return res.slice(0,tope||MAX).map(r=>{
+    const titulo = r.n || r.d;                       // el nombre de la planilla va primero
+    const otro   = (r.n && N(r.n)!==N(r.d)) ? r.d : '';
+    const et=[r.l,r.m?r.m.split('; ').slice(0,3).join(', '):''].filter(Boolean).join(' · ');
+    let lk='';
+    if(r.k) lk+='<a class="lk" href="'+esc(r.k)+'" target="_blank" rel="noopener">MEGA</a>';
+    if(r.x) lk+='<a class="lk sec" href="'+esc(r.x)+'" target="_blank" rel="noopener">MEGA (2do link)</a>';
+    if(r.u) lk+='<a class="lk sec" href="'+esc(r.u)+'" target="_blank" rel="noopener">NAS</a>';
+    if(r.v) lk+='<a class="lk sec" href="'+esc(r.v)+'" target="_blank" rel="noopener">Drive</a>';
+    if(r.w) r.w.split('; ').forEach(p=>{const[n,u]=p.split('|');
+      if(u) lk+='<a class="pub" href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(n)+'</a>';});
+    if(!lk) lk='<span class="fh">sin link</span>';
+    return '<span class="op"><span class="fh">'+fechaCorta(r.f)+'</span><br><b>'+esc(titulo)+'</b>'+
+      (otro?'<span class="alias">en MEGA: '+esc(otro)+'</span>':'')+
+      (et?'<span class="alias">'+esc(et)+'</span>':'')+
+      '<span class="links">'+lk+'</span></span>';
+  }).join('');
+}
+const SALUDO=/^\s*(hola|buenas|buen dia|buenos dias|buenas tardes|buenas noches|que tal|como (andas|estas|va)|gracias|chau|adios|listo|dale|ok)\b/;
+function responder(txt){
+  const t0=N(txt);
+  if(SALUDO.test(t0) && t0.split(/\s+/).length<=4){
+    return esc(elegir([
+      'Todo bien, gracias. ¿Qué material andás buscando?',
+      'Acá andamos. Decime qué necesitás del archivo.',
+      'Bien, ¿y vos? Pedime por localidad, obra, ruta, fecha o funcionario.']));
+  }
+  const c=interpretar(txt);
+  if(!hayCriterios(c)){
+    return elegir(['No te entendí bien qué buscás. Probá con una localidad, una obra, una fecha o un apellido.',
+      'Esa no la tengo. Pedime por localidad, obra, ruta, fecha o funcionario y te busco.',
+      'No me queda claro qué necesitás. Decime por ejemplo «obras en Cruz del Eje» o «vialidad de agosto».']);
+  }
+  let res=filtrar(c), rel=[], locs=[];
+  if(c.orden==='asc') res=res.slice().reverse();
+  const tope=c.limite||MAX;
+  if(c.rutas.length){
+    locs=[...new Set(c.rutas.flatMap(x=>EX.rutas[x]||[]))];
+    if(locs.length){
+      const vistos=new Set(res.map(r=>r.r));
+      rel=IDX.filter(r=>!vistos.has(r.r)&&locs.some(l=>N(r.l).includes(N(l))))
+             .sort((a,b)=>(b.f||'').localeCompare(a.f||'')).slice(0,MAX);
+    }
+  }
+  const det=describir(c);
+  let cab;
+  if(!res.length && !rel.length){
+    cab=elegir(['Uh, no encontré nada'+(det?' '+det:'')+'.',
+      'No hay nada cargado con eso'+(det?' ('+det+')':'')+'.',
+      'Ahí no tengo nada'+(det?' '+det:'')+'.'])+
+      '\nProbá con menos datos, o buscá a mano en MEGA.';
+  } else if(res.length){
+    if(c.limite){
+      const n=Math.min(c.limite,res.length);
+      cab=elegir(['Acá van ','Te paso ','Mirá, estas son '])+
+        (n===1?'la ':'las ')+n+(c.orden==='asc'?' más antigua':' más reciente')+(n===1?'':'s')+
+        (det?' '+det:'')+(res.length>n?' (de '+res.length+' en total)':'')+':';
+    } else {
+      cab=elegir(['Mirá, encontré ','Tengo ','Acá va: ','Te paso lo que hay: '])+
+        res.length+(res.length===1?' carpeta':' carpetas')+(det?' '+det:'')+
+        (res.length>MAX?'. Te muestro las '+MAX+' más nuevas:':':');
+      if(res.length>MAX) cab+='\nSi querés, afiná por fecha o por tipo de material.';
+    }
+  } else {
+    cab='No hay nada que mencione la ruta directamente, pero sí de las localidades que atraviesa.';
+  }
+  let html=esc(cab).replace(/\n/g,'<br>');
+  if(res.length) html+='<br>'+lista(res,tope);
+  if(rel.length) html+='<br><span class="fh">La Ruta '+c.rutas.join(' y ')+' pasa por '+
+    esc(locs.slice(0,5).join(', '))+'. También hay material de esas localidades:</span>'+lista(rel);
+  return html;
+}
+
+/* ---------- interfaz ---------- */
+function burbuja(html,quien){
+  const d=document.createElement('div');d.className='msg '+quien;d.innerHTML=html;
+  d.insertAdjacentHTML('beforeend','<div class="hora">'+
+    new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+'</div>');
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function enviar(){
+  const t=$('txt').value.trim(); if(!t) return;
+  burbuja(esc(t),'yo'); $('txt').value=''; $('txt').style.height='auto'; $('sug').innerHTML='';
+  setTimeout(()=>burbuja(responder(t),'bot'),180);
+}
+$('enviar').onclick=enviar;
+$('txt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();enviar();}});
+$('txt').addEventListener('input',function(){this.style.height='auto';this.style.height=this.scrollHeight+'px';});
+burbuja('Hola, ¿cómo andás? Soy el buscador del archivo audiovisual del Ministerio.\n\n'+
+ 'Pedime material por localidad, obra, ruta, fecha o funcionario y te paso los links de las carpetas.','bot');
+['Lo que tengas de Castelló en Cruz del Eje','Material sobre la Ruta 28','Licitaciones de agosto','Vialidad del mes pasado']
+ .forEach(s=>{const b=document.createElement('button');b.textContent=s;
+   b.onclick=()=>{$('txt').value=s;enviar();};$('sug').appendChild(b);});
+</script>
+</body>
+</html>
